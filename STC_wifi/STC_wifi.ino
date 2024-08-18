@@ -1,10 +1,10 @@
-#include <Wire.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
-#include <ESP8266WiFi.h>
-
+#define BLYNK_TEMPLATE_ID "TMPL2KLUHeagS"
 #define BLYNK_TEMPLATE_NAME "STC WIFI"
-#define BLYNK_AUTH_TOKEN "dYYjBXsLn7ogY8lDS0AiSVepB7kVlj3V"
+#define BLYNK_FIRMWARE_VERSION        "0.1.0"
+
+#define BLYNK_PRINT Serial
+#define APP_DEBUG
+#define USE_NODE_MCU_BOARD
 #define pincooling1 4
 #define pinheating1 5
 #define pinbutton_setup 15
@@ -15,10 +15,18 @@
 #define pinled_heat 3
 #define ONE_WIRE_BUS 2
 
+#include <Blynk.h>
+#include <Wire.h>"
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <ESP8266WiFi.h>
+#include "BlynkEdgent.h"
+
+
+
+
 // constants
 
-const char* WIFI_SSID =  "ADROIVA";
-const char* WIFI_PASS = "Los5locos";
 
 WiFiClient client;
 
@@ -61,30 +69,12 @@ void setup() {
 
   Serial.begin(115200);
   delay(1000);
-  //
-  //  WiFi.mode(WIFI_STA);
-  //  WiFi.begin(WIFI_SSID, WIFI_PASS);
-  //  Serial.print("Conectando a:\t");
-  //  Serial.println(WIFI_SSID);
-  //
-  //  // Esperar a que nos conectemos
-  //  while (WiFi.status() != WL_CONNECTED)
-  //  {
-  //    delay(200);
-  //    Serial.print('.');
-  //  }
-  //
-  //  // Mostrar mensaje de exito y dirección IP asignada
-  //  Serial.println();
-  //  Serial.print("Conectado a:\t");
-  //  Serial.println(WiFi.SSID());
-  //  Serial.print("IP address:\t");
-  //  Serial.println(WiFi.localIP());
-  //
+  BlynkEdgent.begin();
 }
 
 void loop() {
   // put your main code here, to run repeatedly:
+  BlynkEdgent.run();
   if (Serial.available() > 0) {
     float value = Serial.parseFloat();
     if (value != 0) {
@@ -108,6 +98,8 @@ void temperature_control(switches &sw) {
   Serial.print(", Cooling: "); Serial.print(sw.cooling);
   Serial.print(", mmillis: "); Serial.print(millis());
   Serial.print(", compressor: "); Serial.println(millis() - sw.compressor);
+    Serial.print(", compressor_lag: "); Serial.println(sw.compressor_lag);
+
 
 
   if (!(sw.heating && sw.cooling)) {
@@ -144,9 +136,6 @@ void relays(switches &sw, int pincooling, int pinheating) {
   else {
     digitalWrite(pinheating, LOW);
   }
-  if ((sw.cooling) && (millis() - sw.compressor < sw.compressor_lag)){
-    nonBlockingBlink(pinled_on, previousMillis, interval);
-  }
   delay(1000);
 }
 
@@ -160,4 +149,29 @@ void nonBlockingBlink(int ledPin, unsigned long &previousMillis, unsigned long i
       digitalWrite(ledPin, LOW);
     }
   }
+}
+
+BLYNK_WRITE(V0)
+{
+  // any code you place here will execute when the virtual pin value changes
+  Serial.print("Blynk.Cloud is writing something to V0");
+}
+
+
+
+BLYNK_WRITE(V2)
+{
+  // any code you place here will execute when the virtual pin value changes
+  sw1.set =   param.asFloat(); 
+}
+BLYNK_WRITE(V3)
+{
+  // any code you place here will execute when the virtual pin value changes
+  sw1.delta = param.asFloat(); 
+}
+BLYNK_WRITE(V4)
+{
+  // any code you place here will execute when the virtual pin value changes
+  sw1.compressor_lag = param.asFloat() * 60000; 
+
 }
