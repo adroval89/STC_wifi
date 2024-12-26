@@ -96,11 +96,9 @@ void temperature_control(switches &sw) {
   Serial.print(", Delta: "); Serial.print(sw.delta);
   Serial.print(", Heating: "); Serial.print(sw.heating);
   Serial.print(", Cooling: "); Serial.print(sw.cooling);
-  Serial.print(", mmillis: "); Serial.print(millis());
+  Serial.print(", millis: "); Serial.print(millis());
   Serial.print(", compressor: "); Serial.println(millis() - sw.compressor);
     Serial.print(", compressor_lag: "); Serial.println(sw.compressor_lag);
-
-
 
   if (!(sw.heating && sw.cooling)) {
     if (sw.probe < (sw.set - sw.delta)) {
@@ -151,13 +149,16 @@ void nonBlockingBlink(int ledPin, unsigned long &previousMillis, unsigned long i
   }
 }
 
+BLYNK_CONNECTED() 
+{
+  // sync data when the device connects with the cloud.
+    Blynk.syncAll();
+}
 BLYNK_WRITE(V0)
 {
   // any code you place here will execute when the virtual pin value changes
   Serial.print("Blynk.Cloud is writing something to V0");
 }
-
-
 
 BLYNK_WRITE(V2)
 {
