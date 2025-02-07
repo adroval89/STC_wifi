@@ -1,6 +1,5 @@
-#define BLYNK_TEMPLATE_ID "TMPL2KLUHeagS"
+#define BLYNK_TEMPLATE_ID "TMPL2E63cE2pB"
 #define BLYNK_TEMPLATE_NAME "STC WIFI"
-#define BLYNK_FIRMWARE_VERSION        "0.1.0"
 
 #define BLYNK_PRINT Serial
 #define APP_DEBUG
@@ -96,27 +95,23 @@ void loop() {
   //sw1.probe = sensors.getTempCByIndex(0);
   //sw2.probe = sensors.getTempCByIndex(1);
   temperature_control(sw1);
-  //temperature_control(sw2);
-  //  compressorTimeout(sw1, max_cooling);
+  temperature_control(sw2);
   relays(sw1, pincooling1, pinheating1);
+  relays(sw2, pincooling2, pinheating2);
+
   blinkNonBlocking(pinled_on, interval);
 }
 
 void temperature_control(switches &sw) {
   
   long lag_time;
-  Serial.print("Probe: "); Serial.print(sw.probe);
+  Serial.print("  Probe: "); Serial.print(sw.probe);
   Serial.print(", Set: "); Serial.print(sw.set);
   Serial.print(", Delta: "); Serial.print(sw.delta);
   Serial.print(", Heating: "); Serial.print(sw.heating);
   Serial.print(", Cooling: "); Serial.print(sw.cooling);
   Serial.print(", millis: "); Serial.print(millis());
   Serial.print(", compressor: "); Serial.println(millis() - sw.compressor);
-<<<<<<< HEAD
-    Serial.print(", compressor_lag: "); Serial.println(sw.compressor_lag);
-
-=======
- 
   Serial.print(", cooling_timer: "); Serial.println(sw.cool_timer_start);
 
 // if the compressor is resting lag time extended to REST_LAG
@@ -126,7 +121,6 @@ void temperature_control(switches &sw) {
   else{
     lag_time = sw.compressor_lag;
     }
->>>>>>> c058152 (first full implemented version)
   if (!(sw.heating && sw.cooling)) {
     if (sw.probe < (sw.set - sw.delta)) {
       sw.heating = true;
@@ -199,17 +193,13 @@ BLYNK_WRITE(V0)
   sw1.on_heating = param.asInt();
 }
 
-<<<<<<< HEAD
-=======
 BLYNK_WRITE(V1)
 {
   // any code you place here will execute when the virtual pin value changes
-  Serial.print("Blynk.Cloud is writing something to V0");
   sw1.on_cooling = param.asInt();
 }
 
 
->>>>>>> c058152 (first full implemented version)
 BLYNK_WRITE(V2)
 {
   // any code you place here will execute when the virtual pin value changes
@@ -224,5 +214,36 @@ BLYNK_WRITE(V4)
 {
   // any code you place here will execute when the virtual pin value changes
   sw1.compressor_lag = param.asFloat() * 60000;
+
+}
+
+// for a 2nd set of controllers.
+ BLYNK_WRITE(V5)
+{
+  // any code you place here will execute when the virtual pin value changes
+  sw2.on_heating = param.asInt();
+}
+
+BLYNK_WRITE(V6)
+{
+  // any code you place here will execute when the virtual pin value changes
+  sw2.on_cooling = param.asInt();
+}
+
+
+BLYNK_WRITE(V7)
+{
+  // any code you place here will execute when the virtual pin value changes
+  sw2.set = param.asFloat();
+}
+BLYNK_WRITE(V8)
+{
+  // any code you place here will execute when the virtual pin value changes
+  sw2.delta = param.asFloat();
+}
+BLYNK_WRITE(V9)
+{
+  // any code you place here will execute when the virtual pin value changes
+  sw2.compressor_lag = param.asFloat() * 60000;
 
 }
