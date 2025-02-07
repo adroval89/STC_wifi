@@ -47,10 +47,8 @@ bool button_down;
 unsigned long previousMillis = 0;  // Stores the last time the LED was updated
 int ledState = HIGH;     // Initial LED state
 const long interval = 1100;
-long max_cooling = 10000;
-long COMPRESSOR_LAG = 10000;
-long MAX_COOL_TIME = 20000;
-long REST_LAG = 30000;
+long MAX_COOL_TIME = 120000; //7200000 2 hours
+long REST_LAG = 30000; // 1800000 30 minutes
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -58,20 +56,18 @@ DallasTemperature sensors(&oneWire);
 struct switches sw1;
 struct switches sw2;
 
-
-
 void setup() {
   // put your setup code here, to run once:
   
   digitalWrite(pincooling1, HIGH);
   digitalWrite(pinheating1, HIGH);
+  digitalWrite(pincooling2, HIGH);
+  digitalWrite(pinheating2, HIGH);
   pinMode(pincooling1, OUTPUT);
   pinMode(pinheating1, OUTPUT);
   pinMode(pincooling2, OUTPUT);
   pinMode(pinheating2, OUTPUT);
   pinMode(pinled_on, OUTPUT);
-  sw1.compressor_lag = COMPRESSOR_LAG;
-  sw2.compressor_lag = COMPRESSOR_LAG;
 
   sensors.begin();
 
@@ -100,11 +96,16 @@ void loop() {
   relays(sw2, pincooling2, pinheating2);
 
   blinkNonBlocking(pinled_on, interval);
+  //upload temperature measurements.
+
+  Blynk.virtualWrite(V10, sw1.probe);
+  Blynk.virtualWrite(V11, sw2.probe);
 }
 
 void temperature_control(switches &sw) {
   
   long lag_time;
+  
   Serial.print("  Probe: "); Serial.print(sw.probe);
   Serial.print(", Set: "); Serial.print(sw.set);
   Serial.print(", Delta: "); Serial.print(sw.delta);
@@ -154,13 +155,13 @@ void temperature_control(switches &sw) {
 Serial.print(", compressor_lag: "); Serial.println(lag_time);
 }
 void relays(switches &sw, int pincooling, int pinheating) {
-  if (sw.cooling) {
+  if (sw.cooling && sw.on_cooling) {
     digitalWrite(pincooling, LOW);
   }
   else {
     digitalWrite(pincooling, HIGH);
   }
-  if (sw.heating) {
+  if (sw.heating && sw.on_heating) {
     digitalWrite(pinheating, LOW);
   }
   else {
@@ -187,9 +188,11 @@ BLYNK_CONNECTED()
   // sync data when the device connects with the cloud.
     Blynk.syncAll();
 }
+
+// retrieve data when the virtual pin value changes
+
 BLYNK_WRITE(V0)
 {
-  // any code you place here will execute when the virtual pin value changes
   sw1.on_heating = param.asInt();
 }
 
