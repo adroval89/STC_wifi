@@ -28,6 +28,7 @@
 WiFiClient client;
 
 // variables
+float tempsensor;
 struct switches {
   bool on_cooling;
   bool on_heating;
@@ -58,7 +59,7 @@ struct switches sw2;
 
 void setup() {
   // put your setup code here, to run once:
-  
+
   digitalWrite(pincooling1, HIGH);
   digitalWrite(pinheating1, HIGH);
   digitalWrite(pincooling2, HIGH);
@@ -87,9 +88,15 @@ void loop() {
     }
   }
   sensors.requestTemperatures();
-  sensors.getTempCByIndex(0);
-  //sw1.probe = sensors.getTempCByIndex(0);
-  //sw2.probe = sensors.getTempCByIndex(1);
+  tempsensor = sensors.getTempCByIndex(0);
+  // there is an unnknown error that sommetimes it doesnt read correcty. if this happens, do not actualize temperature.
+  if (tempsensor > -127.0) {
+    sw1.probe = tempsensor;
+  }
+  tempsensor = sensors.getTempCByIndex(1);
+  if (tempsensor > -127.0) {
+    sw2.probe = tempsensor;
+  }
   temperature_control(sw1);
   temperature_control(sw2);
   relays(sw1, pincooling1, pinheating1);
@@ -100,12 +107,13 @@ void loop() {
 
   Blynk.virtualWrite(V10, sw1.probe);
   Blynk.virtualWrite(V11, sw2.probe);
+
 }
 
 void temperature_control(switches &sw) {
-  
+
   long lag_time;
-  
+
   Serial.print("  Probe: "); Serial.print(sw.probe);
   Serial.print(", Set: "); Serial.print(sw.set);
   Serial.print(", Delta: "); Serial.print(sw.delta);
@@ -115,13 +123,13 @@ void temperature_control(switches &sw) {
   Serial.print(", compressor: "); Serial.println(millis() - sw.compressor);
   Serial.print(", cooling_timer: "); Serial.println(sw.cool_timer_start);
 
-// if the compressor is resting lag time extended to REST_LAG
-  if(sw.compressor_rest){
+  // if the compressor is resting lag time extended to REST_LAG
+  if (sw.compressor_rest) {
     lag_time = REST_LAG;
   }
-  else{
+  else {
     lag_time = sw.compressor_lag;
-    }
+  }
   if (!(sw.heating && sw.cooling)) {
     if (sw.probe < (sw.set - sw.delta)) {
       sw.heating = true;
@@ -140,11 +148,11 @@ void temperature_control(switches &sw) {
     }
   }
   if (sw.cooling) {
-    if (millis() - sw.cool_timer_start > MAX_COOL_TIME){
+    if (millis() - sw.cool_timer_start > MAX_COOL_TIME) {
       sw.cooling = false;
       sw.compressor_rest = true;
       sw.compressor = millis();
-      }
+    }
     if (sw.probe <= sw.set) {
       sw.cooling = false;
       sw.compressor = millis();
@@ -152,7 +160,7 @@ void temperature_control(switches &sw) {
 
     }
   }
-Serial.print(", compressor_lag: "); Serial.println(lag_time);
+  Serial.print(", compressor_lag: "); Serial.println(lag_time);
 }
 void relays(switches &sw, int pincooling, int pinheating) {
   if (sw.cooling && sw.on_cooling) {
@@ -183,10 +191,10 @@ void blinkNonBlocking(int pin, long interval) {
   }
 }
 
-BLYNK_CONNECTED() 
+BLYNK_CONNECTED()
 {
   // sync data when the device connects with the cloud.
-    Blynk.syncAll();
+  Blynk.syncAll();
 }
 
 // retrieve data when the virtual pin value changes
@@ -221,7 +229,7 @@ BLYNK_WRITE(V4)
 }
 
 // for a 2nd set of controllers.
- BLYNK_WRITE(V5)
+BLYNK_WRITE(V5)
 {
   // any code you place here will execute when the virtual pin value changes
   sw2.on_heating = param.asInt();
