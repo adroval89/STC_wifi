@@ -41,21 +41,31 @@ struct switches {
   long compressor_lag;
   float probe;
   bool compressor_rest = false;
+  String stat = "Idle";
 };
 bool button_setup;
 bool button_up;
 bool button_down;
+bool program = false;
 unsigned long previousMillis = 0;  // Stores the last time the LED was updated
 int ledState = HIGH;     // Initial LED state
 const long interval = 1100;
-long MAX_COOL_TIME = 120000; //7200000 2 hours
-long REST_LAG = 30000; // 1800000 30 minutes
+long MAX_COOL_TIME = 7200000;
+long REST_LAG = 1800000;
+String sw1_change_status = "Idle";
+String sw2_change_status = "Idle";
+
 
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
+BlynkTimer timer;
+// init
+;
+//call programming order.
 
 struct switches sw1;
 struct switches sw2;
+
 
 void setup() {
   // put your setup code here, to run once:
@@ -75,12 +85,15 @@ void setup() {
   Serial.begin(115200);
   delay(1000);
   BlynkEdgent.begin();
+  //Set timer interval to send temmperature data to cloud 1 time each 10 minutes
+  timer.setInterval(600000L, tempSensorTimer);
 }
+
 
 void loop() {
   // put your main code here, to run repeatedly:
+  timer.run();
   BlynkEdgent.run();
-  Blynk.syncAll();
   if (Serial.available() > 0) {
     float value = Serial.parseFloat();
     if (value != 0) {
@@ -103,17 +116,23 @@ void loop() {
   relays(sw2, pincooling2, pinheating2);
 
   blinkNonBlocking(pinled_on, interval);
-  //upload temperature measurements.
 
-  Blynk.virtualWrite(V10, sw1.probe);
-  Blynk.virtualWrite(V11, sw2.probe);
-
+  // Send status data each time the status changes.
+  if (sw1.stat != sw1_change_status) {
+    Blynk.virtualWrite(V12, sw1.stat);
+    sw1_change_status = sw1.stat;
+    Serial.println("Sw1_stat_sent");
+  }
+  if (sw2.stat != sw2_change_status) {
+    Blynk.virtualWrite(V13, sw2.stat);
+    sw2_change_status = sw2.stat;
+    Serial.println("Sw2_stat_sent");
+  }
 }
 
 void temperature_control(switches &sw) {
 
   long lag_time;
-
   Serial.print("  Probe: "); Serial.print(sw.probe);
   Serial.print(", Set: "); Serial.print(sw.set);
   Serial.print(", Delta: "); Serial.print(sw.delta);
@@ -122,6 +141,7 @@ void temperature_control(switches &sw) {
   Serial.print(", millis: "); Serial.print(millis());
   Serial.print(", compressor: "); Serial.println(millis() - sw.compressor);
   Serial.print(", cooling_timer: "); Serial.println(sw.cool_timer_start);
+  Serial.print(", status: "); Serial.println(sw.stat);
 
   // if the compressor is resting lag time extended to REST_LAG
   if (sw.compressor_rest) {
@@ -133,49 +153,78 @@ void temperature_control(switches &sw) {
   if (!(sw.heating && sw.cooling)) {
     if (sw.probe < (sw.set - sw.delta)) {
       sw.heating = true;
+      //set stat to heating
     }
-    if ((sw.probe > (sw.set + sw.delta)) && (millis() - sw.compressor > lag_time)) {
+  }
+  if (millis() - sw.compressor > lag_time) {
+    if (sw.probe > (sw.set + sw.delta)) {
       sw.compressor_rest = false;
       if (sw.cooling == false) {
         sw.cooling = true;
+        //set stat to cooling
         sw.cool_timer_start = millis();
       }
     }
   }
+  else {
+    sw.stat = "Lag";
+  }
   if (sw.heating) {
     if (sw.probe >= sw.set) {
       sw.heating = false;
+      //Set stat to Idle
+      sw.stat = "Idle";
     }
   }
   if (sw.cooling) {
+    //consider if the compressor has been working for more than MAX_COOL_TIME
     if (millis() - sw.cool_timer_start > MAX_COOL_TIME) {
       sw.cooling = false;
       sw.compressor_rest = true;
+      //set status to Rest
+      sw.stat = "Rest";
       sw.compressor = millis();
     }
     if (sw.probe <= sw.set) {
       sw.cooling = false;
+      //set status to Idle
+      sw.stat = "Idle";
       sw.compressor = millis();
       sw.cool_timer_start = 0;
 
     }
   }
-  Serial.print(", compressor_lag: "); Serial.println(lag_time);
+  //Serial.print(", compressor_lag: "); Serial.println(lag_time);
 }
 void relays(switches &sw, int pincooling, int pinheating) {
-  if (sw.cooling && sw.on_cooling) {
-    digitalWrite(pincooling, LOW);
+  if (sw.cooling) {
+    if (sw.on_cooling) {
+      digitalWrite(pincooling, LOW);
+      sw.stat = "Cooling";
+
+    }
+    else {
+      digitalWrite(pincooling, HIGH);
+      sw.stat = "Cooling OFF";
+    }
   }
   else {
     digitalWrite(pincooling, HIGH);
   }
-  if (sw.heating && sw.on_heating) {
-    digitalWrite(pinheating, LOW);
+
+  if (sw.heating) {
+    if (sw.on_heating) {
+      digitalWrite(pinheating, LOW);
+      sw.stat = "Heating";
+    }
+    else {
+      digitalWrite(pinheating, HIGH);
+      sw.stat = "Heating OFF";
+    }
   }
   else {
     digitalWrite(pinheating, HIGH);
   }
-  delay(1000);
 }
 
 void blinkNonBlocking(int pin, long interval) {
@@ -190,11 +239,25 @@ void blinkNonBlocking(int pin, long interval) {
     digitalWrite(pin, ledState);
   }
 }
+//send temperature values
+void tempSensorTimer()
+{
+  // This function describes what will happen with each timer tick. Send temperature info each 10 minutes to avoid
+  // using all packets available
+  Serial.println("Tick");
+  Blynk.virtualWrite(V10, sw1.probe);
+  Blynk.virtualWrite(V11, sw2.probe);
+
+}
+
+
 
 BLYNK_CONNECTED()
 {
   // sync data when the device connects with the cloud.
+
   Blynk.syncAll();
+  Serial.println("Connected and Synced");
 }
 
 // retrieve data when the virtual pin value changes
@@ -202,6 +265,7 @@ BLYNK_CONNECTED()
 BLYNK_WRITE(V0)
 {
   sw1.on_heating = param.asInt();
+  Serial.println("DATA");
 }
 
 BLYNK_WRITE(V1)
@@ -209,7 +273,6 @@ BLYNK_WRITE(V1)
   // any code you place here will execute when the virtual pin value changes
   sw1.on_cooling = param.asInt();
 }
-
 
 BLYNK_WRITE(V2)
 {
