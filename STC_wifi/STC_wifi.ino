@@ -79,9 +79,7 @@ void setup() {
   pinMode(pincooling2, OUTPUT);
   pinMode(pinheating2, OUTPUT);
   pinMode(pinled_on, OUTPUT);
-
   sensors.begin();
-
   Serial.begin(115200);
   delay(1000);
   BlynkEdgent.begin();
@@ -166,7 +164,7 @@ void temperature_control(switches &sw) {
       }
     }
   }
-  else {
+  else if (!sw.compressor_rest) {
     sw.stat = "Lag";
   }
   if (sw.heating) {
