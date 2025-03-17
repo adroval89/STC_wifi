@@ -148,24 +148,36 @@ void temperature_control(switches &sw) {
   else {
     lag_time = sw.compressor_lag;
   }
-  if (!(sw.heating && sw.cooling)) {
+  if (!sw.heating && !sw.cooling) {
     if (sw.probe < (sw.set - sw.delta)) {
-      sw.heating = true;
+      if (sw.on_heating) {
+        sw.heating = true;
+        sw.stat = "Heating";
+      }
+      else {
+        sw.stat = "Heating OFF";
+      }
       //set stat to heating
+    }
+    else if (sw.probe > (sw.set + sw.delta) && !sw.compressor_rest) {
+      sw.stat = "Comp Lag";
     }
   }
   if (millis() - sw.compressor > lag_time) {
     if (sw.probe > (sw.set + sw.delta)) {
       sw.compressor_rest = false;
       if (sw.cooling == false) {
-        sw.cooling = true;
-        //set stat to cooling
-        sw.cool_timer_start = millis();
+        if (sw.on_cooling) {
+          sw.cooling = true;
+          sw.stat = "Cooling";
+          //set stat to cooling
+          sw.cool_timer_start = millis();
+        }
+        else {
+          sw.stat = "Cooling OFF";
+        }
       }
     }
-  }
-  else if (!sw.compressor_rest) {
-    sw.stat = "Lag";
   }
   if (sw.heating) {
     if (sw.probe >= sw.set) {
@@ -173,8 +185,19 @@ void temperature_control(switches &sw) {
       //Set stat to Idle
       sw.stat = "Idle";
     }
+    if (!sw.on_heating) {
+      sw.heating = false;
+      sw.stat = "Heating OFF";
+    }
   }
   if (sw.cooling) {
+    if (sw.probe <= sw.set) {
+      sw.cooling = false;
+      //set status to Idle
+      sw.stat = "Idle";
+      sw.compressor = millis();
+      sw.cool_timer_start = 0;
+    }
     //consider if the compressor has been working for more than MAX_COOL_TIME
     if (millis() - sw.cool_timer_start > MAX_COOL_TIME) {
       sw.cooling = false;
@@ -183,42 +206,29 @@ void temperature_control(switches &sw) {
       sw.stat = "Rest";
       sw.compressor = millis();
     }
-    if (sw.probe <= sw.set) {
+    //handle case where cooling is turned off during cooling
+    if (!sw.on_cooling) {
       sw.cooling = false;
       //set status to Idle
-      sw.stat = "Idle";
+      sw.stat = "Cooling OFF";
       sw.compressor = millis();
       sw.cool_timer_start = 0;
-
     }
   }
   //Serial.print(", compressor_lag: "); Serial.println(lag_time);
+  if (!sw.on_cooling && !sw.on_heating) {
+    sw.stat = "All OFF";
+  }
 }
 void relays(switches &sw, int pincooling, int pinheating) {
   if (sw.cooling) {
-    if (sw.on_cooling) {
-      digitalWrite(pincooling, LOW);
-      sw.stat = "Cooling";
-
-    }
-    else {
-      digitalWrite(pincooling, HIGH);
-      sw.stat = "Cooling OFF";
-    }
+    digitalWrite(pincooling, LOW);
   }
   else {
     digitalWrite(pincooling, HIGH);
   }
-
   if (sw.heating) {
-    if (sw.on_heating) {
-      digitalWrite(pinheating, LOW);
-      sw.stat = "Heating";
-    }
-    else {
-      digitalWrite(pinheating, HIGH);
-      sw.stat = "Heating OFF";
-    }
+    digitalWrite(pinheating, LOW);
   }
   else {
     digitalWrite(pinheating, HIGH);
@@ -263,7 +273,6 @@ BLYNK_CONNECTED()
 BLYNK_WRITE(V0)
 {
   sw1.on_heating = param.asInt();
-  Serial.println("DATA");
 }
 
 BLYNK_WRITE(V1)
